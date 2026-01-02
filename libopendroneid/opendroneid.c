@@ -208,7 +208,7 @@ static uint8_t encodeSpeedHorizontal(float Speed_data, uint8_t *mult)
 */
 static int8_t encodeSpeedVertical(float SpeedVertical_data)
 {
-    int encValue = (int) (SpeedVertical_data / VSPEED_DIV);
+    int encValue = (int) round((SpeedVertical_data / VSPEED_DIV));
     return (int8_t) intRangeMax(encValue, INT8_MIN, INT8_MAX);
 }
 
@@ -223,7 +223,7 @@ static int8_t encodeSpeedVertical(float SpeedVertical_data)
 */
 static int32_t encodeLatLon(double LatLon_data)
 {
-    return (int32_t) intRangeMax((int64_t) (LatLon_data * LATLON_MULT), -180 * LATLON_MULT, 180 * LATLON_MULT);
+    return (int32_t) intRangeMax((int64_t) round(LatLon_data * LATLON_MULT), -180 * LATLON_MULT, 180 * LATLON_MULT);
 }
 
 /**
@@ -237,7 +237,7 @@ static int32_t encodeLatLon(double LatLon_data)
 */
 static uint16_t encodeAltitude(float Alt_data)
 {
-    return (uint16_t) intRangeMax( (int) ((Alt_data + (float) ALT_ADDER) / ALT_DIV), 0, UINT16_MAX);
+    return (uint16_t) intRangeMax( (int) roundf((Alt_data + (float) ALT_ADDER) / ALT_DIV), 0, UINT16_MAX);
 }
 
 /**
