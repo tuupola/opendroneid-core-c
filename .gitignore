@@ -25,3 +25,8 @@ wifi/sender/sender
 .idea/
 cmake-build*
 build
+
+# Claude Code
+CLAUDE.md
+.claude/
+docs/superpowers/
