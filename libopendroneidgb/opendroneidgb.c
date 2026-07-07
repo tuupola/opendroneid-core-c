@@ -1,18 +1,26 @@
 /*
- * opendroneidgb.c
- *
- * GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
- * (中华人民共和国民用无人驾驶航空器系统运营识别规范)
- *
- * Parses the broadcast-mode RID packet as defined in section 5.2 of the standard.
- *
- * Packet format (section 5.2.1, Table 1):
- *   [Type=0xFF][Ver+Reserved][DataLen][FlagBytes(1~7, chained by bit 0)][Data]
- *
- * All multi-byte fields are little-endian per the spec.
- *
- * Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
- */
+Copyright (C) 2025 Jun Zhang
+
+SPDX-License-Identifier: Apache-2.0
+
+Open Drone ID C Library — GB 46750-2025
+
+Maintainer:
+Jun Zhang
+zhangjun.sole@qq.com
+
+GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
+(中华人民共和国民用无人驾驶航空器系统运营识别规范)
+
+Parses the broadcast-mode RID packet as defined in section 5.2 of the standard.
+
+Packet format (section 5.2.1, Table 1):
+  [Type=0xFF][Ver+Reserved][DataLen][FlagBytes(1~7, chained by bit 0)][Data]
+
+All multi-byte fields are little-endian per the spec.
+
+Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
+*/
 
 #include "opendroneidgb.h"
 #include <string.h>

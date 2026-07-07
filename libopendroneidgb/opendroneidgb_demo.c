@@ -1,3 +1,15 @@
+/*
+Copyright (C) 2025 Jun Zhang
+
+SPDX-License-Identifier: Apache-2.0
+
+Open Drone ID C Library — GB 46750-2025
+
+Maintainer:
+Jun Zhang
+zhangjun.sole@qq.com
+*/
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>

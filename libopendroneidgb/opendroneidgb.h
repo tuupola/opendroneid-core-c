@@ -1,17 +1,25 @@
 /*
- * opendroneidgb.h
- *
- * GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
- * (中华人民共和国民用无人驾驶航空器系统运营识别规范)
- *
- * Broadcast-mode RID packet parser for the Chinese national standard.
- * See opendroneidgb.c for the encoding details.
- *
- * Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
- */
+Copyright (C) 2025 Jun Zhang
 
-#ifndef OPENDRONEIF_GB46750_H
-#define OPENDRONEIF_GB46750_H
+SPDX-License-Identifier: Apache-2.0
+
+Open Drone ID C Library — GB 46750-2025
+
+Maintainer:
+Jun Zhang
+zhangjun.sole@qq.com
+
+GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
+(中华人民共和国民用无人驾驶航空器系统运营识别规范)
+
+Broadcast-mode RID packet parser for the Chinese national standard.
+See opendroneidgb.c for the encoding details.
+
+Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
+*/
+
+#ifndef OPENDRONEID_GB46750_H
+#define OPENDRONEID_GB46750_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -186,4 +194,4 @@ bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
 }
 #endif
 
-#endif // OPENDRONEIF_GB46750_H
+#endif // OPENDRONEID_GB46750_H
