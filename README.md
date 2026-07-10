@@ -309,6 +309,23 @@ This signature is calculated using a signing key obtained during the registratio
 
 Update Jan 2023: There now appears to be a version of the rule available in [English](https://www.mlit.go.jp/koku/content/001582250.pdf).
 
+### China
+
+China has published [GB 46750-2025](https://openstd.samr.gov.cn/) (中华人民共和国民用无人驾驶航空器系统运营识别规范) — a national standard for civil UAS operational identification, effective 2026-05-01.
+
+GB 46750-2025 defines an **independent protocol** that is not wire-compatible with ASTM F3411. Key differences include:
+
+* A separate broadcast-mode wire format (flag-bitmask chain instead of fixed 25-byte message types).
+* Both a 20-character serial number **and** an 8-character real-name registration ID (UIN) are mandatory.
+* No authentication mechanism is defined.
+* Operator/GCS location (position + altitude + type) is mandatory.
+* GNSS accuracy levels (horizontal, vertical, speed, and timestamp) are mandatory fields.
+* Transmission uses Bluetooth 5.0+ and Wi-Fi (2.4 GHz / 5.8 GHz).
+* Supports both WGS-84 and CGCS2000 coordinate systems.
+* Drone class (Micro through Large) is mandatory.
+
+The library implementation is in [`libopendroneidgb/`](libopendroneidgb/). See the [GB 46750-2025 README](libopendroneidgb/README.md) for the complete field specification and protocol format.
+
 ### Protocol versions
 
 The continued development of the relevant standards is reflected in the remote ID protocol version number transmitted in the header of each drone ID message.
@@ -389,3 +406,4 @@ M: Mandatory. O: Optional. R: Recommended
 9. The Japanese rule mandates that both the Serial number and the Registration ID be broadcast in multiple Basic ID messages.
 10. Uses Wi-Fi Beacon transmission as defined in ASTM F3411-22a.
 11. Based on auto-translated document from Japanese to English. Can contain errors.
+12. **China (GB 46750-2025):** Uses an independent wire format that is not compatible with ASTM F3411. See the [GB 46750-2025 section](#china) above and [`libopendroneidgb/README.md`](libopendroneidgb/README.md) for details.
