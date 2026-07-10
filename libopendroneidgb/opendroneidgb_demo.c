@@ -12,6 +12,7 @@ zhangjun.sole@qq.com
 
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
 #include "opendroneidgb.h"
@@ -72,7 +73,7 @@ static RID_Status_t demo_encode_beacon(const DroneRIDData_t *data,
     RID_Status_t ret = GB46750_RID_Encode(data, rid, sizeof(rid), &rid_len);
     if (ret != RID_OK) return ret;
 
-    printf("Encoded RID packet: %zu bytes\n", rid_len);
+    printf("Encoded RID packet: %lu bytes\n", (unsigned long)rid_len);
     printf("Hex: ");
     for (size_t i = 0; i < rid_len; i++)
         printf("%02X ", rid[i]);
@@ -117,8 +118,8 @@ static RID_Status_t demo_encode_beacon(const DroneRIDData_t *data,
     pos += rid_len;
 
     *beacon_len = pos;
-    printf("Beacon frame: %zu bytes (hdr 24 + fixed 12 + SSID IE %d + RID %zu)\n\n",
-           pos, 2 + ssid_len, rid_len);
+    printf("Beacon frame: %lu bytes (hdr 24 + fixed 12 + SSID IE %u + RID %lu)\n\n",
+           (unsigned long)pos, (unsigned)(2 + ssid_len), (unsigned long)rid_len);
     return RID_OK;
 }
 
@@ -132,12 +133,18 @@ static RID_Status_t demo_decode_beacon(const uint8_t *beacon, size_t beacon_len,
                                         DroneRIDData_t *data, uint8_t *version)
 {
     /* 1. Find RID packet in beacon body (offset 36+) */
+    if (beacon_len < 36) {
+        printf("ERROR: beacon too short (need >= 36, got %lu)\n",
+               (unsigned long)beacon_len);
+        return RID_ERR_PARAM;
+    }
     size_t off = 0, len = 0;
     if (!GB46750_FindPacket(beacon + 36, beacon_len - 36, &off, &len)) {
         printf("ERROR: GB46750_FindPacket() found nothing!\n");
         return RID_ERR_PARSE_FAIL;
     }
-    printf("Found RID packet at body offset %zu, length %zu bytes\n\n", off, len);
+    printf("Found RID packet at body offset %lu, length %lu bytes\n\n",
+           (unsigned long)off, (unsigned long)len);
 
     /* 2. Decode */
     RID_Status_t ret = GB46750_RID_Decode(beacon + 36 + off, len, data, version);
@@ -157,26 +164,26 @@ static RID_Status_t demo_decode_beacon(const uint8_t *beacon, size_t beacon_len,
            data->op_category);
     printf("GCS position type:     %d (0=Takeoff, 1=GCS)\n", data->gcs_pos_type);
     printf("GCS position:          %.7f, %.7f\n", data->gcs_lon, data->gcs_lat);
-    printf("GCS geodetic alt:      %.1f m\n", data->gcs_alt);
+    printf("GCS geodetic alt:      %.1f m\n", (double)data->gcs_alt);
     printf("UAV position:          %.7f, %.7f\n", data->drone_lon, data->drone_lat);
-    printf("Track angle:           %.1f\n", data->track_angle);
-    printf("Ground speed:          %.1f m/s\n", data->ground_speed);
+    printf("Track angle:           %.1f\n", (double)data->track_angle);
+    printf("Ground speed:          %.1f m/s\n", (double)data->ground_speed);
     if (data->has_rel_alt)
-        printf("Relative altitude:     %.1f m\n", data->rel_alt);
+        printf("Relative altitude:     %.1f m\n", (double)data->rel_alt);
     if (data->has_v_speed)
         printf("Vertical speed:        %.1f m/s (%s)\n",
-               data->vertical_speed,
+               (double)data->vertical_speed,
                data->vertical_speed >= 0 ? "ascending" : "descending");
-    printf("UAV geodetic alt:      %.1f m\n", data->drone_alt);
+    printf("UAV geodetic alt:      %.1f m\n", (double)data->drone_alt);
     if (data->has_pressure_alt)
-        printf("Barometric alt:        %.1f m\n", data->pressure_alt);
+        printf("Barometric alt:        %.1f m\n", (double)data->pressure_alt);
     printf("Operation status:      %d (0=Unknown,1=Ground,2=Air,3=Emergency)\n",
            data->op_status);
     printf("Coordinate system:     %d (0=WGS84, 1=CGCS2000)\n", data->coord_system);
     printf("Horizontal accuracy:   level %d\n", data->horizontal_accuracy);
     printf("Vertical accuracy:     level %d\n", data->vertical_accuracy);
     printf("Speed accuracy:        level %d\n", data->speed_accuracy);
-    printf("Timestamp:             %llu ms\n", (unsigned long long)data->timestamp_ms);
+    printf("Timestamp:             %" PRIu64 " ms\n", data->timestamp_ms);
     printf("Timestamp accuracy:    level %d\n", data->timestamp_accuracy);
     return RID_OK;
 }
@@ -248,9 +255,9 @@ static void demo_verify_roundtrip(const DroneRIDData_t *orig,
     printf("  %-22s %d vs %d  %s\n", "speed_accuracy",
            orig->speed_accuracy, decoded->speed_accuracy,
            orig->speed_accuracy == decoded->speed_accuracy ? "OK" : "MISMATCH");
-    printf("  %-22s %llu vs %llu  %s\n", "timestamp_ms",
-           (unsigned long long)orig->timestamp_ms,
-           (unsigned long long)decoded->timestamp_ms,
+    printf("  %-22s %" PRIu64 " vs %" PRIu64 "  %s\n", "timestamp_ms",
+           orig->timestamp_ms,
+           decoded->timestamp_ms,
            orig->timestamp_ms == decoded->timestamp_ms ? "OK" : "MISMATCH");
     printf("  %-22s %d vs %d  %s\n", "timestamp_accuracy",
            orig->timestamp_accuracy, decoded->timestamp_accuracy,

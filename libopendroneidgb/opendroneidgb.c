@@ -23,6 +23,7 @@ Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
 */
 
 #include "opendroneidgb.h"
+#include <math.h>
 #include <string.h>
 
 /* ===================== Endianness Helpers ===================== */
@@ -99,9 +100,13 @@ bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
             if ((beacon_data[flag_pos] & 0x01) == 0)
                 break;
             flag_pos++;
-            if (flag_bytes > 10)
+            if (flag_bytes > 7)
                 break;
         }
+
+        /* Spec: 1~7 flag bytes; reject matches with too many */
+        if (flag_bytes > 7)
+            continue;
 
         size_t total_rid_len = 3 + flag_bytes + data_len;
         if (i + total_rid_len > beacon_len)
@@ -135,12 +140,20 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
         return RID_ERR_INVALID_TYPE;
     }
 
+    /* Version field: high 3 bits fixed to 001 (0x20 mask), per spec section 5.2.1 */
+    if ((buf[1] & 0xE0) != 0x20) {
+        return RID_ERR_INVALID_TYPE;
+    }
+
     /* Sub-version: bits 4-0 of byte 1 (V1.X) */
     if (version != NULL) {
         *version = buf[1] & 0x1F;
     }
 
     uint8_t data_len = buf[2];
+    if (data_len < 1 || data_len > 200) {
+        return RID_ERR_INVALID_LEN;
+    }
 
     /* 3. Walk the flag-byte chain (section 5.2.1, Table 1)
      *    Flag bytes: 1~7 bytes. Bit 0 = extension flag:
@@ -196,26 +209,28 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
     /* -------- Flag byte 1 -------- */
 
     /* 001 — Unique product ID (SN), mandatory.
-     *       ASCII, max 20 bytes, padded with NULL (0x00) when shorter. */
+     *       ASCII, max 20 bytes, padded with NULL (0x00) when shorter.
+     *       Validate BEFORE copying — don't write to output on error. */
     if (flag1 & 0x80) {
         if (p + 20 > end) return RID_ERR_PARSE_FAIL;
+        if (!is_valid_ascii_field(p, 20))
+            return RID_ERR_PARSE_FAIL;
         memcpy(data->sn, p, 20);
         data->sn[20] = '\0';
-        if (!is_valid_ascii_field((const uint8_t *)data->sn, 20))
-            return RID_ERR_PARSE_FAIL;
         p += 20;
     } else {
         return RID_ERR_PARSE_FAIL;
     }
 
     /* 002 — Last 8 characters of real-name registration mark, mandatory.
-     *       ASCII, 8 bytes, padded with NULL when shorter. */
+     *       ASCII, 8 bytes, padded with NULL when shorter.
+     *       Validate BEFORE copying — don't write to output on error. */
     if (flag1 & 0x40) {
         if (p + 8 > end) return RID_ERR_PARSE_FAIL;
+        if (!is_valid_ascii_field(p, 8))
+            return RID_ERR_PARSE_FAIL;
         memcpy(data->uin, p, 8);
         data->uin[8] = '\0';
-        if (!is_valid_ascii_field((const uint8_t *)data->uin, 8))
-            return RID_ERR_PARSE_FAIL;
         p += 8;
     } else {
         return RID_ERR_PARSE_FAIL;
@@ -295,7 +310,13 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
     if (flag2 & 0x40) {
         if (p + 2 > end) return RID_ERR_PARSE_FAIL;
         uint16_t code = le16_to_h(p);
-        data->track_angle = (code == 0xFFFF) ? -1.0f : (float)code / 10.0f;
+        if (code == 0xFFFF) {
+            data->track_angle = -1.0f;
+        } else if (code > 3599) {
+            return RID_ERR_PARSE_FAIL;
+        } else {
+            data->track_angle = (float)code / 10.0f;
+        }
         p += 2;
     } else {
         return RID_ERR_PARSE_FAIL;
@@ -437,6 +458,25 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
         return RID_ERR_PARAM;
     }
 
+    /* --- Validate numeric fields: reject NaN/Inf to prevent UB on cast --- */
+    if (!isfinite(data->gcs_lon)   || !isfinite(data->gcs_lat)   ||
+        !isfinite(data->drone_lon) || !isfinite(data->drone_lat) ||
+        !isfinite(data->gcs_alt)   || !isfinite(data->drone_alt) ||
+        !isfinite(data->track_angle) || !isfinite(data->ground_speed)) {
+        return RID_ERR_PARAM;
+    }
+    if ((data->has_rel_alt      && !isfinite(data->rel_alt))      ||
+        (data->has_v_speed      && !isfinite(data->vertical_speed)) ||
+        (data->has_pressure_alt && !isfinite(data->pressure_alt))) {
+        return RID_ERR_PARAM;
+    }
+
+    /* --- Validate mandatory string fields are non-empty --- */
+    if (data->sn[0]  == '\0' ||
+        data->uin[0] == '\0') {
+        return RID_ERR_PARAM;
+    }
+
     /* --- Build flag bytes --- */
     uint8_t flag1 = 0x80  /* 001 SN */
                   | 0x40  /* 002 UIN */
@@ -519,7 +559,8 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
 
     /* 001 — SN: 20 bytes ASCII, pad with \0 */
     {
-        size_t slen = strlen(data->sn);
+        size_t slen = 0;
+        while (slen < 20 && data->sn[slen] != '\0') slen++;
         for (int i = 0; i < 20; i++)
             p[i] = (i < (int)slen) ? (uint8_t)data->sn[i] : 0x00;
         p += 20;
@@ -527,7 +568,8 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
 
     /* 002 — UIN: 8 bytes ASCII, pad with \0 */
     {
-        size_t slen = strlen(data->uin);
+        size_t slen = 0;
+        while (slen < 8 && data->uin[slen] != '\0') slen++;
         for (int i = 0; i < 8; i++)
             p[i] = (i < (int)slen) ? (uint8_t)data->uin[i] : 0x00;
         p += 8;
@@ -585,7 +627,9 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
     {
         uint16_t code = 0xFFFF;
         if (data->track_angle >= 0.0f) {
-            float v = data->track_angle * 10.0f + 0.5f;
+            /* Spec: "向下取整" (floor). C float→uint cast truncates
+             * toward zero, which equals floor for non-negative values. */
+            float v = data->track_angle * 10.0f;
             if (v > 3599.0f) v = 3599.0f;
             code = (uint16_t)v;
         }
@@ -597,7 +641,9 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
     {
         uint16_t code = 0xFFFF;
         if (data->ground_speed >= 0.0f) {
-            float v = data->ground_speed * 10.0f + 0.5f;
+            /* Spec: "向下取整" (floor). C float→uint cast truncates
+             * toward zero, which equals floor for non-negative values. */
+            float v = data->ground_speed * 10.0f;
             if (v > 65534.0f) v = 65534.0f;
             code = (uint16_t)v;
         }
@@ -622,7 +668,9 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
     if (data->has_v_speed) {
         float abs_spd = (data->vertical_speed >= 0.0f)
             ? data->vertical_speed : -data->vertical_speed;
-        uint8_t mag = (uint8_t)(abs_spd * 2.0f + 0.5f);
+        float mag_f = abs_spd * 2.0f + 0.5f;
+        if (mag_f > 127.0f) mag_f = 127.0f;
+        uint8_t mag = (uint8_t)mag_f;
         if (mag > 0x7F) mag = 0x7F;
         uint8_t code = mag;
         if (data->vertical_speed < 0.0f) code |= 0x80;
