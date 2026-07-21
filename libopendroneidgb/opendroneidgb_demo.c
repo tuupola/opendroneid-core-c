@@ -148,9 +148,12 @@ static RID_Status_t demo_decode_beacon(const uint8_t *beacon, size_t beacon_len,
 
     /* 2. Decode */
     RID_Status_t ret = GB46750_RID_Decode(beacon + 36 + off, len, data, version);
-    if (ret != RID_OK) {
+    if (ret < 0) {
         printf("ERROR: GB46750_RID_Decode() failed, code=%d\n", ret);
         return ret;
+    }
+    if (ret == RID_OK_EXTENSION) {
+        printf("NOTE: Packet contains additional flag bytes beyond the 3 currently defined — future CAAC extension fields were skipped.\n\n");
     }
 
     /* 3. Print */
@@ -285,8 +288,10 @@ int main(void)
         return -1;
 
     /* 3. Decode from beacon */
-    if (demo_decode_beacon(beacon, beacon_len, &decoded, &version) != RID_OK)
-        return -1;
+    {
+        RID_Status_t ret = demo_decode_beacon(beacon, beacon_len, &decoded, &version);
+        if (ret < 0) return -1;
+    }
 
     /* 4. Verify roundtrip */
     demo_verify_roundtrip(&orig, &decoded);

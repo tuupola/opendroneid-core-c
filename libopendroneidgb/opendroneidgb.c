@@ -15,7 +15,10 @@ GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
 Parses the broadcast-mode RID packet as defined in section 5.2 of the standard.
 
 Packet format (section 5.2.1, Table 1):
-  [Type=0xFF][Ver+Reserved][DataLen][FlagBytes(1~7, chained by bit 0)][Data]
+  [Type=0xFF][Ver+Reserved][DataLen][Flag bytes (chained via bit 0)][Data]
+
+Flag byte chain: bits 1-7 = content flags, bit 8 = extension flag.
+The chain is open-ended per §5.2.2; currently 3 bytes defined.
 
 All multi-byte fields are little-endian per the spec.
 
@@ -92,7 +95,12 @@ bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
         if (data_len < 1 || data_len > 200)
             continue;
 
-        /* Count flag bytes (bit0 = extension flag) */
+        /* Count flag bytes (bit0 = extension flag, per Table 1).
+         * Standard §5.2.1 Table 1: bits 1-7 = content flag bits,
+         * bit 8 = extension flag (0 = end, 1 = next byte follows).
+         * The chain is open-ended — currently 3 bytes defined for
+         * fields 001-021; additional bytes reserved for future CAAC
+         * protocol extensions. */
         size_t flag_bytes = 0;
         size_t flag_pos = i + 3;
         while (flag_pos < beacon_len) {
@@ -100,12 +108,10 @@ bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
             if ((beacon_data[flag_pos] & 0x01) == 0)
                 break;
             flag_pos++;
-            if (flag_bytes > 7)
-                break;
         }
 
-        /* Spec: 1~7 flag bytes; reject matches with too many */
-        if (flag_bytes > 7)
+        /* Must have at least 1 flag byte */
+        if (flag_bytes == 0)
             continue;
 
         size_t total_rid_len = 3 + flag_bytes + data_len;
@@ -145,29 +151,39 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
         return RID_ERR_INVALID_TYPE;
     }
 
-    /* Sub-version: bits 4-0 of byte 1 (V1.X) */
+    /* Sub-version: bits 4-0 of byte 1 (V1.X).
+     * NOTE: The standard §5.2.1 Table 1 states bits 4–8 encode 0–63, but
+     * 5 bits can only represent 0–31 — an arithmetic inconsistency in the
+     * standard text. This implementation uses the 5-bit field (0x1F mask,
+     * range 0–31) as the sub-version, which is the physically encodable range. */
     if (version != NULL) {
         *version = buf[1] & 0x1F;
     }
 
+    /* DataLen = byte count of data content items only (excludes flag bytes),
+     * per standard Table 1: 数据长度 = 数据内容项的字节数. */
     uint8_t data_len = buf[2];
     if (data_len < 1 || data_len > 200) {
         return RID_ERR_INVALID_LEN;
     }
 
-    /* 3. Walk the flag-byte chain (section 5.2.1, Table 1)
-     *    Flag bytes: 1~7 bytes. Bit 0 = extension flag:
-     *        0 → last flag byte
-     *        1 → another flag byte follows
-     *    Only the first 3 flag bytes are used for fields 001-021;
-     *    any additional bytes are reserved for future extension.
-     */
+    /* 3. Walk the flag-byte chain (§5.2.1 Table 1)
+     *    Standard: bits 1-7 = content flags, bit 8 = extension flag
+     *    (0 = end of flag field, 1 = next byte continues the chain).
+     *    The chain is open-ended — currently 3 bytes defined (fields
+     *    001-021); additional bytes reserved for future CAAC extensions.
+     *
+     *    Forward-compatibility: we only parse the first 3 flag bytes
+     *    (known fields).  Extra flag bytes are still counted (so the
+     *    data pointer advances past the correct number of field bytes),
+     *    but their corresponding data fields are silently skipped —
+     *    unknown future fields do not break decoding of known fields. */
     uint8_t flags[3] = {0, 0, 0};
     int num_flag_bytes = 0;
     const uint8_t *fp   = &buf[3];
     const uint8_t *bend = buf + buf_len;
 
-    while (fp < bend && num_flag_bytes < 7) {
+    while (fp < bend) {
         if (num_flag_bytes < 3) {
             flags[num_flag_bytes] = *fp;
         }
@@ -209,7 +225,8 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
     /* -------- Flag byte 1 -------- */
 
     /* 001 — Unique product ID (SN), mandatory.
-     *       ASCII, max 20 bytes, padded with NULL (0x00) when shorter.
+     *       ASCII, max 20 bytes. Per standard: trailing (high-address)
+     *       bytes are NULL-padded when the ID is shorter than 20 chars.
      *       Validate BEFORE copying — don't write to output on error. */
     if (flag1 & 0x80) {
         if (p + 20 > end) return RID_ERR_PARSE_FAIL;
@@ -445,7 +462,7 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
         return RID_ERR_PARSE_FAIL;
     }
 
-    return RID_OK;
+    return (num_flag_bytes > 3) ? RID_OK_EXTENSION : RID_OK;
 }
 
 /* ===================== Encode Function ===================== */
@@ -546,6 +563,8 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
     /* --- Write header --- */
     buf[0] = 0xFF;        /* Type */
     buf[1] = 0x20;        /* Version (high 3 bits=001, sub-version 0) */
+    /* DataLen = byte count of data items only (excludes flag bytes).
+     * Per standard Table 1: 数据长度 = 数据内容项的字节数. */
     buf[2] = (uint8_t)dlen;
 
     /* --- Write flag bytes --- */
@@ -557,7 +576,10 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
 
     /* ============ Flag byte 1 fields ============ */
 
-    /* 001 — SN: 20 bytes ASCII, pad with \0 */
+    /* 001 — SN: 20 bytes ASCII.
+     * Per standard: "高位以空字符NULL填充" — pad with \0 at the
+     * trailing (high-address) end when the serial number is shorter
+     * than 20 characters. Data starts at the low-address (first) byte. */
     {
         size_t slen = 0;
         while (slen < 20 && data->sn[slen] != '\0') slen++;
@@ -566,7 +588,9 @@ RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
         p += 20;
     }
 
-    /* 002 — UIN: 8 bytes ASCII, pad with \0 */
+    /* 002 — UIN: 8 bytes ASCII.
+     * Per standard: "高位补NULL" — pad with \0 at the trailing
+     * (high-address) end when the registration mark is shorter. */
     {
         size_t slen = 0;
         while (slen < 8 && data->uin[slen] != '\0') slen++;

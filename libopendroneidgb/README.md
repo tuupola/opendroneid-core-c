@@ -10,6 +10,14 @@ independent of ASTM F3411 — GB 46750-2025 uses its own wire format, field set,
 transmission rules. See the [Differences from ASTM F3411](#differences-from-astm-f3411)
 section below.
 
+> **⚠ Compliance scope:** GB 46750-2025 mandates **both** broadcast mode (§5.2) and
+> network mode (§5.3) for full compliance. This library implements broadcast mode only.
+> Additionally, the standard specifies product-level requirements in §5.1 (transmission
+> interval ≤1s, antenna placement, 10s shutdown grace period, ADS-B prohibition, etc.)
+> that must be satisfied at the hardware/firmware level — these are outside the scope
+> of this software library. Manufacturers must implement network mode and meet all §5.1
+> requirements to achieve full GB 46750-2025 compliance.
+
 ## 1. Packet Format
 
 Each broadcast-mode RID packet uses a **flag-bitmask chain** structure (not TLV tags):
@@ -25,16 +33,16 @@ Each broadcast-mode RID packet uses a **flag-bitmask chain** structure (not TLV 
 | Byte offset | Field    | Description |
 |-------------|----------|-------------|
 | 0           | Type     | Always `0xFF` — distinguishes GB 46750 packets from other beacon payload. |
-| 1           | Version  | Bits 7–5: protocol major version, always `001` (V1). Bits 4–0: sub-version, 0–63 (rendered as `V1.X`). |
-| 2           | DataLen  | Total byte count of the Flag Bytes + Data region (1–200). |
-| 3 … 3+N-1   | Flags    | 1–3 flag bytes, chained: bit 0 of each byte is the *extension flag* — `1` = another flag byte follows, `0` = last flag byte. Bits 7–1 signal the presence of protocol fields (see Section 2). |
+| 1           | Version  | Bits 7–5: protocol major version, always `001` (V1). Bits 4–0: sub-version. **Standard note:** The standard text states bits 4–8 can encode 0–63, but 5 bits can only encode 0–31 — an arithmetic inconsistency in the standard itself. This implementation uses bits 4–0 (5 bits, range 0–31) as the sub-version, rendered as `V1.X`. |
+| 2           | DataLen  | Byte count of the data content items only (1–200), excluding the flag bytes. Per standard Table 1: 数据长度 = 数据内容项的字节数. |
+| 3 … 3+N-1   | Flags    | Variable-length flag bytes, chained via bit 0. Per standard: bits 1–7 (MSB-side) = content flag bits; bit 8 (LSB, 0x01) = extension flag — `1` = next byte continues, `0` = end. Currently 3 bytes defined (fields 001–021); the chain is open-ended for future CAAC extensions. |
 | 3+N …       | Data     | Concatenated field values, each fixed-length per the protocol. Fields appear in ascending field-ID order (001 → 021). Omitted fields (flag bit = 0) consume zero bytes here. |
 
 **Flag chain rules:**
-- A minimum of 1 flag byte is always present.
-- A maximum of 3 flag bytes are defined; bit 0 of the 3rd byte is reserved (should be `0`).
-- The receiver walks the chain to compute the total flag-region size, then subtracts it
-  from `DataLen` to determine the data-region size.
+- Bits 1–7 of each flag byte = content flag bits (per Table 2 mapping).
+- Bit 8 (LSB, 0x01) = extension flag: `0` = end of flag field, `1` = next byte continues the chain.
+- Currently 3 flag bytes are defined (fields 001–021); the chain is open-ended for future CAAC extensions.
+- The receiver walks the chain to compute the total flag-region size, then uses `DataLen` to determine the data-region size.
 
 ## 2. Flag Bit Mapping
 
@@ -78,8 +86,8 @@ field. Fields marked **M** (Mandatory) are always transmitted; fields marked **O
 
 | ID  | Field Name           | Bytes | Encoding & Range                                          | Invalid / Absent | M/O |
 |-----|----------------------|-------|-----------------------------------------------------------|------------------|-----|
-| 001 | SN                   | 20    | ASCII per GB/T 41300, padded with `\0`. Max 20 chars.     | —                | M   |
-| 002 | UIN                  | 8     | ASCII, last 8 chars of real-name registration mark, `\0`-padded. | —          | M   |
+| 001 | SN                   | 20    | ASCII per GB/T 41300, max 20 chars. Per standard: "高位以空字符NULL填充" — pad with `\0` at the trailing (high-address) end when shorter than 20 bytes. | —                | M   |
+| 002 | UIN                  | 8     | ASCII, last 8 chars of real-name registration mark. Per standard: "高位补NULL" — pad with `\0` at the trailing end when shorter than 8 bytes. | —          | M   |
 | 003 | Operation Category   | 1     | 0=Undefined, 1=Open, 2=Specific, 3=Certified, 4–15=Reserved. | —            | O   |
 | 004 | Drone Class          | 1     | 0=Micro, 1=Light, 2=Small, 3=Medium, 4=Large, 5–15=Reserved. | —            | M   |
 | 005 | GCS Position Type    | 1     | 0=Takeoff point, 1=GCS location, 2–15=Reserved.           | —                | M   |

@@ -31,7 +31,10 @@ extern "C" {
 
 /* ===================== Error Code Definition ===================== */
 typedef enum {
-    RID_OK = 0,                // Operation succeeded
+    RID_OK = 0,                // Operation succeeded, all known fields parsed
+    RID_OK_EXTENSION = 1,      // Success, but packet contains additional flag
+                                //   bytes beyond the 3 currently defined —
+                                //   future CAAC extension fields were skipped
     RID_ERR_PARAM = -1,        // Invalid or null input parameter
     RID_ERR_INVALID_TYPE = -3, // Packet type mismatch (not 0xFF)
     RID_ERR_INVALID_LEN = -4,  // Data length mismatch
