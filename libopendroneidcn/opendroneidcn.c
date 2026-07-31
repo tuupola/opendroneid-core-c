@@ -1,15 +1,15 @@
 /*
-Copyright (C) 2025 Jun Zhang
+Copyright (C) 2026 Jun Zhang
 
 SPDX-License-Identifier: Apache-2.0
 
-Open Drone ID C Library — GB 46750-2025
+Open Drone ID C Library — CN 46750-2025
 
 Maintainer:
 Jun Zhang
 zhangjun.sole@qq.com
 
-GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
+CN 46750-2025 — Civil Unmanned Aircraft System Operational Identification
 (中华人民共和国民用无人驾驶航空器系统运营识别规范)
 
 Parses the broadcast-mode RID packet as defined in section 5.2 of the standard.
@@ -22,16 +22,16 @@ The chain is open-ended per §5.2.2; currently 3 bytes defined.
 
 All multi-byte fields are little-endian per the spec.
 
-Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
+Reference: CN 46750-2025 (published 2025-10-31, effective 2026-05-01)
 */
 
-#include "opendroneidgb.h"
+#include "opendroneidcn.h"
 #include <math.h>
 #include <string.h>
 
 /* ===================== Endianness Helpers ===================== */
 /*
- * GB 46750-2025 specifies all multi-byte numeric fields as little-endian.
+ * CN 46750-2025 specifies all multi-byte numeric fields as little-endian.
  * Byte-shift macros work on any CPU regardless of host endianness — no
  * runtime detection needed, and the compiler optimizes them to single
  * load+rev instructions on big-endian targets.
@@ -68,7 +68,7 @@ static inline void h_to_le32(uint8_t p[4], uint32_t v)
  * Validate that an ASCII field contains only printable characters
  * (0x20–0x7E) or null padding (0x00). Returns false if any byte is
  * non-printable, non-null — used to reject garbage data from
- * false-positive GB46750 packet matches.
+ * false-positive CN46750 packet matches.
  */
 static bool is_valid_ascii_field(const uint8_t *buf, int len) {
     for (int i = 0; i < len; i++) {
@@ -78,7 +78,7 @@ static bool is_valid_ascii_field(const uint8_t *buf, int len) {
     return true;
 }
 
-bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
+bool CN46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
                         size_t *rid_offset, size_t *rid_len)
 {
     if (beacon_data == NULL || beacon_len < 6)
@@ -127,7 +127,7 @@ bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
 
 /* ===================== Parse Function ===================== */
 
-RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
+RID_Status_t CN46750_RID_Decode(const uint8_t *buf,
                                size_t       buf_len,
                                DroneRIDData_t *data,
                                uint8_t      *version)
@@ -467,7 +467,7 @@ RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
 
 /* ===================== Encode Function ===================== */
 
-RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
+RID_Status_t CN46750_RID_Encode(const DroneRIDData_t *data,
                                 uint8_t *buf, size_t buf_size,
                                 size_t *out_len)
 {

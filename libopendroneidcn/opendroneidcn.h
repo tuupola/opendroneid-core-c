@@ -1,25 +1,25 @@
 /*
-Copyright (C) 2025 Jun Zhang
+Copyright (C) 2026 Jun Zhang
 
 SPDX-License-Identifier: Apache-2.0
 
-Open Drone ID C Library — GB 46750-2025
+Open Drone ID C Library — CN 46750-2025
 
 Maintainer:
 Jun Zhang
 zhangjun.sole@qq.com
 
-GB 46750-2025 — Civil Unmanned Aircraft System Operational Identification
+CN 46750-2025 — Civil Unmanned Aircraft System Operational Identification
 (中华人民共和国民用无人驾驶航空器系统运营识别规范)
 
 Broadcast-mode RID packet parser for the Chinese national standard.
-See opendroneidgb.c for the encoding details.
+See opendroneidcn.c for the encoding details.
 
-Reference: GB 46750-2025 (published 2025-10-31, effective 2026-05-01)
+Reference: CN 46750-2025 (published 2025-10-31, effective 2026-05-01)
 */
 
-#ifndef OPENDRONEID_GB46750_H
-#define OPENDRONEID_GB46750_H
+#ifndef OPENDRONEID_CN46750_H
+#define OPENDRONEID_CN46750_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -156,45 +156,45 @@ typedef struct {
 /* ===================== Encode / Decode API ===================== */
 
 /**
- * @brief  Decode GB 46750-2025 byte stream into physical value structure
+ * @brief  Decode CN 46750-2025 byte stream into physical value structure
  * @param  buf      [IN]  Raw byte stream
  * @param  buf_len  [IN]  Length of byte stream
  * @param  data     [OUT] Parsed RID data
  * @param  version  [OUT] Protocol sub-version, can be NULL
  * @return Error code, RID_OK on success
  */
-RID_Status_t GB46750_RID_Decode(const uint8_t *buf,
+RID_Status_t CN46750_RID_Decode(const uint8_t *buf,
                                 size_t buf_len,
                                 DroneRIDData_t *data,
                                 uint8_t *version);
 
 /**
- * @brief  Encode DroneRIDData_t structure into GB 46750-2025 byte stream
+ * @brief  Encode DroneRIDData_t structure into CN 46750-2025 byte stream
  * @param  data      [IN]  RID data structure to encode
  * @param  buf       [OUT] Output buffer for encoded byte stream
  * @param  buf_size  [IN]  Size of output buffer (recommend >= 128 bytes)
  * @param  out_len   [OUT] Actual encoded byte length, can be NULL
  * @return Error code, RID_OK on success
  */
-RID_Status_t GB46750_RID_Encode(const DroneRIDData_t *data,
+RID_Status_t CN46750_RID_Encode(const DroneRIDData_t *data,
                                 uint8_t *buf, size_t buf_size,
                                 size_t *out_len);
 
 /* ===================== Beacon Scanner ===================== */
 
 /**
- * @brief  Locate a GB 46750-2025 RID packet inside raw beacon frame data
+ * @brief  Locate a CN 46750-2025 RID packet inside raw beacon frame data
  * @param  beacon_data [IN]  Raw 802.11 beacon frame body (after radiotap header)
  * @param  beacon_len  [IN]  Length of beacon data in bytes
  * @param  rid_offset  [OUT] Byte offset where the RID packet starts (may be NULL)
  * @param  rid_len     [OUT] Total byte length of the RID packet (may be NULL)
- * @return true if a valid GB46750 packet header was found
+ * @return true if a valid CN46750 packet header was found
  */
-bool GB46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
+bool CN46750_FindPacket(const uint8_t *beacon_data, size_t beacon_len,
                         size_t *rid_offset, size_t *rid_len);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // OPENDRONEID_GB46750_H
+#endif // OPENDRONEID_CN46750_H

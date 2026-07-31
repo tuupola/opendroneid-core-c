@@ -1,9 +1,9 @@
 /*
-Copyright (C) 2025 Jun Zhang
+Copyright (C) 2026 Jun Zhang
 
 SPDX-License-Identifier: Apache-2.0
 
-Open Drone ID C Library — GB 46750-2025
+Open Drone ID C Library — CN 46750-2025
 
 Maintainer:
 Jun Zhang
@@ -15,7 +15,7 @@ zhangjun.sole@qq.com
 #include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
-#include "opendroneidgb.h"
+#include "opendroneidcn.h"
 
 /* ================================================================
  * Test data — fill a DroneRIDData_t with realistic values
@@ -70,7 +70,7 @@ static RID_Status_t demo_encode_beacon(const DroneRIDData_t *data,
     /* 1. Encode RID packet */
     uint8_t rid[256];
     size_t rid_len = 0;
-    RID_Status_t ret = GB46750_RID_Encode(data, rid, sizeof(rid), &rid_len);
+    RID_Status_t ret = CN46750_RID_Encode(data, rid, sizeof(rid), &rid_len);
     if (ret != RID_OK) return ret;
 
     printf("Encoded RID packet: %lu bytes\n", (unsigned long)rid_len);
@@ -127,7 +127,7 @@ static RID_Status_t demo_encode_beacon(const DroneRIDData_t *data,
  * Decode: beacon frame → find RID packet → decode → print
  *
  * Mirrors main.c:packet_handler():
- *   GB46750_FindPacket(payload + 36, length - 36, &off, &len)
+ *   CN46750_FindPacket(payload + 36, length - 36, &off, &len)
  * ================================================================ */
 static RID_Status_t demo_decode_beacon(const uint8_t *beacon, size_t beacon_len,
                                         DroneRIDData_t *data, uint8_t *version)
@@ -139,17 +139,17 @@ static RID_Status_t demo_decode_beacon(const uint8_t *beacon, size_t beacon_len,
         return RID_ERR_PARAM;
     }
     size_t off = 0, len = 0;
-    if (!GB46750_FindPacket(beacon + 36, beacon_len - 36, &off, &len)) {
-        printf("ERROR: GB46750_FindPacket() found nothing!\n");
+    if (!CN46750_FindPacket(beacon + 36, beacon_len - 36, &off, &len)) {
+        printf("ERROR: CN46750_FindPacket() found nothing!\n");
         return RID_ERR_PARSE_FAIL;
     }
     printf("Found RID packet at body offset %lu, length %lu bytes\n\n",
            (unsigned long)off, (unsigned long)len);
 
     /* 2. Decode */
-    RID_Status_t ret = GB46750_RID_Decode(beacon + 36 + off, len, data, version);
+    RID_Status_t ret = CN46750_RID_Decode(beacon + 36 + off, len, data, version);
     if (ret < 0) {
-        printf("ERROR: GB46750_RID_Decode() failed, code=%d\n", ret);
+        printf("ERROR: CN46750_RID_Decode() failed, code=%d\n", ret);
         return ret;
     }
     if (ret == RID_OK_EXTENSION) {
